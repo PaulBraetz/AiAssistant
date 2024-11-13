@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AiAssistant": {
+      "commandName": "Project",
+      "commandLineArgs": "--Settings:PromptsCachePath=\"F:\\dev\\git\\ConsoleApp1\\ConsoleApp1\\bin\\Debug\\net9.0\\prompt_cache.db\"\r\n"
+    }
+  }
+}

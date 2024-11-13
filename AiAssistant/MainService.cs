@@ -15,13 +15,15 @@ using Microsoft.Extensions.VectorData;
 using System.Collections.ObjectModel;
 using Microsoft.Extensions.Hosting;
 using System.Collections.Generic;
+using System.Reflection;
 
-class AiService(IChatClient client, IVectorStore vectorStore, CacheablePromptFactory promptFactory, IHostApplicationLifetime lifetime) : BackgroundService
+class MainService(IChatClient client, IVectorStore vectorStore, CacheablePromptFactory promptFactory, IHostApplicationLifetime lifetime, Settings settings) : BackgroundService
 {
     private static readonly Style _assistantStyle = new(Color.SeaGreen1_1);
     private static readonly Style _userStyle = new(Color.DarkOrange);
     private static readonly Style _systemStyle = new(Color.Purple4_1);
     private static readonly Style _toolStyle = new(Color.BlueViolet);
+    private static readonly Style _mutedStyle = new(Color.Grey);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -59,8 +61,7 @@ class AiService(IChatClient client, IVectorStore vectorStore, CacheablePromptFac
 
                 prompt.Response = response.Message.Text ?? String.Empty;
                 _ = await promptsCache.UpsertAsync(prompt, cancellationToken: stoppingToken);
-            } catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested) { }
-            catch(Exception ex) when(PromptUserConfirmation($"ignore exception of type {ex.GetType()}?"))
+            } catch(OperationCanceledException) when(stoppingToken.IsCancellationRequested) { } catch(Exception ex) when(PromptUserConfirmation($"ignore exception of type {ex.GetType()}?"))
             { }
         }
     }
@@ -125,13 +126,36 @@ class AiService(IChatClient client, IVectorStore vectorStore, CacheablePromptFac
                 .AddChoice(false)
                 .DefaultValue(false)
                 .WithConverter(choice => choice ? "y" : "n"));
+    private void PrintSettings()
+    {
+        var table = new Table()
+        {
+            Expand = true,
+            Width = Int32.MaxValue
+        }.AddColumns("setting", "value");
 
+        var props = typeof(Settings).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+        foreach(var prop in props)
+        {
+            _ = table.AddRow(new Text(prop.Name, _mutedStyle), new Text(prop.GetValue(settings)?.ToString() ?? String.Empty));
+        }
+
+        AnsiConsole.Clear();
+        AnsiConsole.Write(table);
+        AnsiConsole.WriteLine("press any key to return");
+        _ = Console.ReadKey();
+    }
     private String PromptUserString(String prompt, ObservableCollection<ChatMessage> history)
     {
         var result = AnsiConsole.Prompt(new TextPrompt<String>($"[darkorange]{prompt}[/] "));
         switch(result)
         {
             case "/r":
+                Refresh(history);
+                return PromptUserString(prompt, history);
+            case "/s":
+                PrintSettings();
                 Refresh(history);
                 return PromptUserString(prompt, history);
             case "/q":
@@ -195,7 +219,7 @@ class AiService(IChatClient client, IVectorStore vectorStore, CacheablePromptFac
         AnsiConsole.Write(table);
     }
 
-    private static void PrintHints() => AnsiConsole.Write(new Text("/r - resize\t/q - quit\n", new Style(Color.Grey)));
+    private static void PrintHints() => AnsiConsole.Write(new Text("/r - resize\t/q - quit\t/s - settings\n", _mutedStyle));
 
     [Description("Gets a random integer that is bound to an exclusive upper bound that must be less than 100.")]
     static Int32 GetRandomInteger([Description("The exclusive upper bound of the random number to be generated. max must be greater than or equal to 0 and less than 100.")] Int32 max)

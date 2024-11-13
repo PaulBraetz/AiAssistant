@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 
 using OpenAI;
@@ -17,11 +18,17 @@ var builder = Host.CreateApplicationBuilder(args);
 _ = builder.Logging.SetMinimumLevel(LogLevel.Error);
 var openaiCreds = new ApiKeyCredential(new ConfigurationManager().AddJsonFile("appsettings.secrets.json").AddCommandLine(args).Build().GetValue<String>("OpenAiKey") ?? throw new Exception("no api key found"));
 _ = builder.Services
-    .AddHostedService<AiService>()
+    .AddHostedService<MainService>()
+    .AddSingleton(sp => sp.GetRequiredService<IOptions<Settings>>().Value)
+    .AddOptions<Settings>()
+    .BindConfiguration("Settings")
+    .PostConfigure(s => s.PromptsCachePath ??= "prompts_cache.db")
+    .Services
     .AddSingleton<CacheablePromptFactory>()
     .AddSingleton(sp =>
     {
-        var connection = new SqliteConnection("Data Source=prompt_cache.db");
+        var settings = sp.GetRequiredService<Settings>();
+        var connection = new SqliteConnection($"Data Source={settings.PromptsCachePath}");
 
         connection.LoadExtension("vec0");
 
