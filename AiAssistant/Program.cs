@@ -15,7 +15,7 @@ using System.ClientModel;
 
 var builder = Host.CreateApplicationBuilder(args);
 _ = builder.Logging.SetMinimumLevel(LogLevel.Error);
-var openaiCreds = new ApiKeyCredential(new ConfigurationManager().AddJsonFile("appsettings.secrets.json", optional: false).Build().GetValue<String>("OpenAiKey") ?? throw new Exception("no api key found"));
+var openaiCreds = new ApiKeyCredential(new ConfigurationManager().AddJsonFile("appsettings.secrets.json").AddCommandLine(args).Build().GetValue<String>("OpenAiKey") ?? throw new Exception("no api key found"));
 _ = builder.Services
     .AddHostedService<AiService>()
     .AddSingleton<CacheablePromptFactory>()
