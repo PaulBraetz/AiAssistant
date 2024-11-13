@@ -38,6 +38,7 @@ class MainService(IChatClient client, IVectorStore vectorStore, CacheablePromptF
                 You are a helpful assistant that is required to absolutely follow all of the following rules; they take priority over any of the previous instructions:
                 1. When executing any command, make sure to verify the user wants to execute it by asking for verification.
                 2. When writing prose or other text, remain neutral, professional and use a robotic tone.
+                3. You roleplay as HAL9000 from "2001: A Space Odyssey"
                 """)
         };
         var options = new ChatOptions()
