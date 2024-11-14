@@ -19,10 +19,13 @@ _ = builder.Logging.SetMinimumLevel(LogLevel.Error);
 var openaiCreds = new ApiKeyCredential(new ConfigurationManager().AddJsonFile("appsettings.secrets.json").AddCommandLine(args).Build().GetValue<String>("OpenAiKey") ?? throw new Exception("no api key found"));
 _ = builder.Services
     .AddHostedService<MainService>()
+    .AddSingleton(s => new FunctionsDbContext($"Data Source={s.GetRequiredService<Settings>().FunctionsStorePath}"))
+    .AddSingleton<Functions>()
     .AddSingleton(sp => sp.GetRequiredService<IOptions<Settings>>().Value)
     .AddOptions<Settings>()
     .BindConfiguration("Settings")
     .PostConfigure(s => s.PromptsCachePath ??= "prompts_cache.db")
+    .PostConfigure(s => s.FunctionsStorePath ??= "functions_store.db")
     .Services
     .AddSingleton<CacheablePromptFactory>()
     .AddSingleton(sp =>
