@@ -17,6 +17,7 @@ using Microsoft.Extensions.Hosting;
 using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.CodeAnalysis.CSharp;
+using RadLine;
 
 class MainService : BackgroundService
 {
@@ -119,17 +120,17 @@ class MainService : BackgroundService
     private async Task<ChatOptions> CreateOptions(CancellationToken stoppingToken)
     {
         _ = await Task.WhenAll(
-                    ( await _functions.GetAll(stoppingToken) )
-                    .Select(f =>
-                        AddFunctionCore(
-                            f.SourceCode,
-                            f.UsingsStatements,
-                            (f, ct) =>
-                            {
-                                _tools.Add(AIFunctionFactory.Create(f, target: null));
-                                return Task.FromResult(false);
-                            },
-                            stoppingToken)));
+            ( await _functions.GetAll(stoppingToken) )
+            .Select(f =>
+                AddFunctionCore(
+                    f.SourceCode,
+                    f.UsingsStatements,
+                    (f, ct) =>
+                    {
+                        _tools.Add(AIFunctionFactory.Create(f, target: null));
+                        return Task.FromResult(false);
+                    },
+                    stoppingToken)));
         var options = new ChatOptions() { Tools = _tools };
         return options;
     }
@@ -217,23 +218,36 @@ class MainService : BackgroundService
         AnsiConsole.WriteLine("press any key to return");
         _ = Console.ReadKey();
     }
-    private async Task<String> PromptUserString(String prompt, List<ChatMessage> history, CancellationToken cancellationToken)
+    private async Task<String> PromptUserString(String prompt, List<ChatMessage> history, CancellationToken ct)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var result = AnsiConsole.Prompt(new TextPrompt<String>($"[darkorange]{prompt}[/] "));
+        ct.ThrowIfCancellationRequested();
+
+        AnsiConsole.Write(new Rule("prompt") { Justification = Justify.Left });
+        var editor = new LineEditor()
+        {
+            MultiLine = true,
+            Prompt = new LineNumberPrompt(new Style(foreground: Color.DarkOrange)),
+            Completion = new PromptCompletion(),
+            Highlighter = new WordHighlighter()
+                .AddWord("SHIFT", new Style(foreground: Color.Grey))
+                .AddWord("ENTER", new Style(foreground: Color.Grey))
+        };
+
+        var result = await editor.ReadLine(ct) ?? String.Empty;
+
         switch(result)
         {
             case "/r":
                 Refresh(history);
-                return await PromptUserString(prompt, history, cancellationToken);
+                return await PromptUserString(prompt, history, ct);
             case "/s":
                 PrintSettings();
                 Refresh(history);
-                return await PromptUserString(prompt, history, cancellationToken);
+                return await PromptUserString(prompt, history, ct);
             case "/q":
                 _lifetime.StopApplication();
-                await Task.Delay(500, cancellationToken);
-                return await PromptUserString(prompt, history, cancellationToken);
+                await Task.Delay(500, ct);
+                return await PromptUserString(prompt, history, ct);
             default:
                 return result;
         }
@@ -255,10 +269,6 @@ class MainService : BackgroundService
         }.AddColumns("role", "message");
 
         table.Rows.Clear();
-        //var panelHeight = Console.WindowHeight - 10;
-        //panel.Height = panelHeight;
-        //var messages = ( history.Count - panelHeight is > 0 and { } skipCount ? history.Skip(skipCount) : history )
-        //    .Take(panelHeight);
         foreach(var msg in history)
         {
             const Single blendFactor = 0.75f;
@@ -294,7 +304,7 @@ class MainService : BackgroundService
         AnsiConsole.Write(table);
     }
 
-    private static void PrintHints() => AnsiConsole.Write(new Text("/r - resize\t/q - quit\t/s - settings\n", _mutedStyle));
+    private static void PrintHints() => AnsiConsole.Write(new Text("/r - resize\t/q - quit\t/s - settings\tSHIFT+ENTER - new line\tENTER - submit\n", _mutedStyle));
 
     [Description("Gets a random integer that is bound to an exclusive upper bound that must be less than 100.")]
     static Int32 GetRandomInteger([Description("The exclusive upper bound of the random number to be generated. max must be greater than or equal to 0 and less than 100.")] Int32 max)
@@ -412,7 +422,7 @@ class MainService : BackgroundService
     }
     [Description("Analyzes an image found at a local path. The analysis is done by an llm, the result of the completion request is returned by the function." +
                  "SAFETY-CRITICAL")]
-    async Task<ChatCompletion> AnalyzeLocalImage(
+    async Task<String> AnalyzeLocalImage(
         [Description("The path of the local png image file to analyze.")]
         String localPath,
         CancellationToken ct)
@@ -441,7 +451,7 @@ class MainService : BackgroundService
                 Contents = [new ImageContent(url)]
             }], cancellationToken: ct);
 
-        return response;
+        return response.Message.Text ?? String.Empty;
     }
     async Task<String> AddFunctionCore(
         String sourceCode,

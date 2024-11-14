@@ -1,23 +1,11 @@
-﻿using AiAssistant;
+﻿using RadLine;
 
-using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Microsoft.SemanticKernel;
+public sealed class PromptCompletion : ITextCompletion
+{
+    public IEnumerable<String> GetCompletions(String context, String word, String suffix) => [];
+}
 
-using OpenAI;
-using OpenAI.Embeddings;
-
-using RadLine;
-
-using Spectre.Console;
-
-using System.ClientModel;
-
+#if false
 var builder = Host.CreateApplicationBuilder(args);
 _ = builder.Logging.SetMinimumLevel(LogLevel.Error);
 var openaiCreds = new ApiKeyCredential(new ConfigurationManager().AddJsonFile("appsettings.secrets.json").AddCommandLine(args).Build().GetValue<String>("OpenAiKey") ?? throw new Exception("no api key found"));
@@ -59,3 +47,5 @@ _ = builder.Services
 
 var host = builder.Build();
 await host.RunAsync();
+
+#endif
